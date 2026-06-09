@@ -1,25 +1,33 @@
 """
-CLOUDGUARD-B — BACKGROUND AUTO-STEPPER
+SENTINELOPS — BACKGROUND AUTO-STEPPER
 ========================================
 Continuously runs simulation ticks and emits structured events
 through the War Room WebSocket so the frontend is never blank.
+
+Hybrid Mode: Queries Splunk for real threats first, falls back
+to simulation if Splunk is empty or unavailable.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import random
 import uuid
 from datetime import datetime, timezone
 
-logger = logging.getLogger("cloudguard.auto_stepper")
+logger = logging.getLogger("sentinelops.auto_stepper")
 
 STEP_INTERVAL_S    = 4.0
 NARRATIVE_INTERVAL = 3
 FORECAST_INTERVAL  = 5
 TOPOLOGY_INTERVAL  = 6
 TICKER_INTERVAL    = 2
+SPLUNK_QUERY_INTERVAL = 4  # query Splunk every Nth tick
+
+USE_SPLUNK = os.getenv("SPLUNK_MODE", "true").lower() == "true"
+USE_CLAUDE = os.getenv("NARRATIVE_PROVIDER", "template").lower() == "claude"
 
 _DRIFT_TYPES = [
     "IAM_POLICY_CHANGE", "PUBLIC_EXPOSURE", "ENCRYPTION_REMOVED",
@@ -156,6 +164,105 @@ def _build_direct_ui_forecast(target, probability, signal_type, w_r, w_c,
     }
 
 
+def _build_narrative_from_splunk_threat(threat_data: dict, w_r: float, w_c: float,
+                                         j_before: float, j_after: float) -> dict:
+    """Build a NarrativeChunk from a real Splunk threat instead of hardcoded templates."""
+    data = threat_data.get("data", threat_data)
+    severity = data.get("severity", "MEDIUM")
+    resource_id = data.get("resource_id", "unknown")
+    description = data.get("description", "Security event detected")
+    source_ip = data.get("source_ip", "")
+    drift_type = data.get("drift_type", "IAM_POLICY_CHANGE")
+
+    severity_emoji = {"CRITICAL": "⛔", "HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}.get(severity, "⚠️")
+
+    heading = f"⚔️ Sentry Assessment — {severity} {drift_type.replace('_', ' ').title()} on {resource_id}"
+    body = (
+        f"{description}. Assessed severity: {severity} {severity_emoji}. "
+        f"Source: {source_ip}. "
+        f"This event was detected from live Splunk telemetry and represents a real security signal "
+        f"requiring immediate triage per [NIST SP 800-61r2]."
+    )
+
+    decision_id = f"dec-{uuid.uuid4().hex[:8]}"
+    return _build_direct_ui_narrative(
+        "threat", heading, body, "[NIST SP 800-61r2]",
+        decision_id, j_before, j_before, w_r, w_c,
+    ), decision_id
+
+
+async def _generate_claude_narrative(threat_data: dict, chunk_type: str) -> Optional[str]:
+    """Generate narrative text using Claude (direct or via OpenRouter). Returns None on failure."""
+    if not USE_CLAUDE:
+        return None
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None
+
+    try:
+        data = threat_data.get("data", threat_data)
+        prompts = {
+            "threat": (
+                f"You are a security operations analyst for SentinelOps. A {data.get('severity', 'MEDIUM')} "
+                f"severity {data.get('drift_type', 'security event')} was detected on resource "
+                f"{data.get('resource_id', 'unknown')}. Source IP: {data.get('source_ip', 'unknown')}. "
+                f"Description: {data.get('description', 'N/A')}. "
+                f"Produce a 2-3 sentence threat assessment. Be direct. Include the compliance citation."
+            ),
+            "argument": (
+                f"You are a cost-optimization controller. Given a {data.get('severity', 'MEDIUM')} "
+                f"security event on {data.get('resource_id', 'unknown')}, produce a 2-3 sentence "
+                f"economic counter-argument analyzing the ROSI and remediation cost tradeoff. "
+                f"Include dollar figures and break-even timeline."
+            ),
+            "synthesis": (
+                f"You are the orchestrator synthesizing a Pareto-optimal remediation path. "
+                f"The threat is {data.get('severity', 'MEDIUM')} on {data.get('resource_id', 'unknown')}. "
+                f"Produce a 2-3 sentence synthesis explaining the J-Score equilibrium achieved "
+                f"and the autonomous execution window."
+            ),
+        }
+
+        prompt = prompts.get(chunk_type, prompts["threat"])
+
+        if api_key.startswith("sk-or-"):
+            import httpx
+            model = os.getenv("CLAUDE_MODEL", "anthropic/claude-sonnet-4-6")
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model,
+                        "max_tokens": 200,
+                        "messages": [
+                            {"role": "system", "content": "You are a concise security analyst. No markdown. No bullet points. Plain English only."},
+                            {"role": "user", "content": prompt},
+                        ],
+                    },
+                )
+                resp.raise_for_status()
+                result = resp.json()
+                return result["choices"][0]["message"]["content"]
+        else:
+            import anthropic
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=200,
+                messages=[{"role": "user", "content": prompt}],
+                system="You are a concise security analyst. No markdown. No bullet points. Plain English only.",
+            )
+            return response.content[0].text
+    except Exception as exc:
+        logger.warning(f"Claude narrative generation failed: {exc}")
+        return None
+
+
 async def run_auto_stepper():
     """Background coroutine: continuously steps simulation and emits events."""
     from cloudguard.api.streamer import (
@@ -164,7 +271,12 @@ async def run_auto_stepper():
     )
     from cloudguard.api.routes import get_engine
 
-    logger.info("🤖 Auto-Stepper: initializing simulation engine...")
+    if USE_SPLUNK:
+        from cloudguard.mcp_client import get_all_threats, get_ssh_brute_force, get_splunk_status
+        status = get_splunk_status()
+        logger.info(f"Splunk status: {status}")
+
+    logger.info(f"🤖 Auto-Stepper: initializing (SPLUNK_MODE={USE_SPLUNK}, NARRATIVE={USE_CLAUDE})")
     await asyncio.sleep(2.0)
 
     try:
@@ -184,6 +296,7 @@ async def run_auto_stepper():
 
     tick = 0
     w_r, w_c, j_score = 0.60, 0.40, 0.50
+    _last_splunk_threats: list[dict] = []
 
     for i in range(30):
         rid = f"res-{i+1:03d}"
@@ -211,7 +324,28 @@ async def run_auto_stepper():
             w_c = round(1.0 - w_r, 3)
             j_score = round(max(0.15, min(0.85, j_score + random.uniform(-0.02, 0.015))), 4)
 
-            # DRIFT
+            # SPLUNK-SOURCED THREATS (hybrid: real data first, simulation fallback)
+            if USE_SPLUNK and tick % SPLUNK_QUERY_INTERVAL == 0:
+                try:
+                    if tick % (SPLUNK_QUERY_INTERVAL * 3) == 0:
+                        splunk_threats = get_ssh_brute_force(w_r, w_c)
+                    else:
+                        splunk_threats = get_all_threats(w_r, w_c)
+
+                    if splunk_threats:
+                        _last_splunk_threats = splunk_threats
+                        for threat in splunk_threats[:3]:
+                            await emit_event(threat)
+                            data = threat.get("data", {})
+                            rid = data.get("resource_id", "")
+                            sev = data.get("severity", "MEDIUM")
+                            if rid:
+                                _update_topology(rid, sev)
+                        logger.info(f"Emitted {min(3, len(splunk_threats))} Splunk threats")
+                except Exception as exc:
+                    logger.warning(f"Splunk query failed, using simulation: {exc}")
+
+            # DRIFT (simulation fallback or supplementary)
             if random.random() < 0.4:
                 rid = random.choice(_RESOURCE_IDS[:60])
                 sev = random.choice(_SEVERITY_LEVELS)
@@ -251,24 +385,45 @@ async def run_auto_stepper():
                     },
                 })
 
-            # NARRATIVE CHUNKS
+            # NARRATIVE CHUNKS (enhanced with Splunk data + optional Claude)
             if tick % NARRATIVE_INTERVAL == 0:
                 did = f"dec-{uuid.uuid4().hex[:8]}"
                 j_b = j_score
                 j_a = round(j_score - random.uniform(0.01, 0.04), 4)
 
-                threat = _build_direct_ui_narrative(
-                    "threat", random.choice(_THREAT_HEADINGS),
-                    random.choice(_THREAT_BODIES), "[NIST IA-2]",
-                    did, j_b, j_b, w_r, w_c,
-                )
-                await _broadcast(threat)
-                EVENT_BUFFER.append(threat)
+                # Use Splunk threat data for narrative if available
+                if _last_splunk_threats and USE_SPLUNK:
+                    threat_source = random.choice(_last_splunk_threats)
+                    threat_chunk, did = _build_narrative_from_splunk_threat(
+                        threat_source, w_r, w_c, j_b, j_b
+                    )
+                    # Try Claude for richer body text
+                    claude_body = await _generate_claude_narrative(threat_source, "threat")
+                    if claude_body:
+                        threat_chunk["message_body"]["body"] = claude_body
+                else:
+                    threat_chunk = _build_direct_ui_narrative(
+                        "threat", random.choice(_THREAT_HEADINGS),
+                        random.choice(_THREAT_BODIES), "[NIST IA-2]",
+                        did, j_b, j_b, w_r, w_c,
+                    )
+
+                await _broadcast(threat_chunk)
+                EVENT_BUFFER.append(threat_chunk)
                 await asyncio.sleep(1.0)
+
+                # Argument chunk (optionally Claude-enhanced)
+                arg_body = random.choice(_ARGUMENT_BODIES)
+                if _last_splunk_threats and USE_CLAUDE:
+                    claude_arg = await _generate_claude_narrative(
+                        random.choice(_last_splunk_threats) if _last_splunk_threats else {}, "argument"
+                    )
+                    if claude_arg:
+                        arg_body = claude_arg
 
                 argument = _build_direct_ui_narrative(
                     "argument", random.choice(_ARGUMENT_HEADINGS),
-                    random.choice(_ARGUMENT_BODIES), "[Gordon & Loeb (2002)]",
+                    arg_body, "[Gordon & Loeb (2002)]",
                     did, j_b, j_b, w_r, w_c,
                 )
                 await _broadcast(argument)
@@ -276,9 +431,17 @@ async def run_auto_stepper():
                 await asyncio.sleep(1.0)
 
                 is_fp = random.random() < 0.3
+                synth_body = random.choice(_SYNTHESIS_BODIES)
+                if _last_splunk_threats and USE_CLAUDE:
+                    claude_synth = await _generate_claude_narrative(
+                        random.choice(_last_splunk_threats) if _last_splunk_threats else {}, "synthesis"
+                    )
+                    if claude_synth:
+                        synth_body = claude_synth
+
                 synthesis = _build_direct_ui_narrative(
                     "synthesis", random.choice(_SYNTHESIS_HEADINGS),
-                    random.choice(_SYNTHESIS_BODIES),
+                    synth_body,
                     "[NSGA-II] [NIST AI RMF]", did, j_b, j_a, w_r, w_c,
                     countdown_active=True,
                     seconds_remaining=10 if is_fp else 60,

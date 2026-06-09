@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="public/logo.png" alt="CloudGuard Logo" width="80" />
+  <img src="public/logo.png" alt="SentinelOps Logo" width="80" />
 </p>
 
-<h1 align="center">CloudGuard</h1>
+<h1 align="center">SentinelOps</h1>
 
 <p align="center">
-  <strong>GenAI-Powered Autonomous Cloud Security Governance Platform</strong>
+  <strong>AI-Powered Autonomous Security Operations Platform</strong>
 </p>
 
 <p align="center">
@@ -45,7 +45,7 @@
 
 ## Overview
 
-CloudGuard is an autonomous cloud security governance platform that leverages a **multi-agent AI swarm** to detect misconfigurations, forecast threats, and autonomously remediate vulnerabilities — all in real time. It combines cutting-edge concepts from multi-objective optimization, stochastic forecasting, and explainable AI into a unified command center.
+SentinelOps is an autonomous security operations platform that leverages a **multi-agent AI swarm** to detect misconfigurations, forecast threats, and autonomously remediate vulnerabilities — all in real time. It connects to **Splunk Enterprise** for real security telemetry and uses **Claude** for intelligent narrative generation.
 
 ### What It Does
 
@@ -328,7 +328,7 @@ source .venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 
 # Start the backend server
-uvicorn cloudguard.app:app --port 8000
+uvicorn cloudguard.app:app --port 8001
 ```
 
 > [!WARNING]
@@ -643,5 +643,5 @@ This project is licensed under the **MIT License**. See [`pyproject.toml`](pypro
 ---
 
 <p align="center">
-  <sub>Built by <a href="https://github.com/Mustafa11300">Mustafa Hussain</a> · © 2026 CloudGuard AI</sub>
+  <sub>Built by <a href="https://github.com/Mustafa11300">Mustafa Hussain</a> · © 2026 SentinelOps AI</sub>
 </p>
