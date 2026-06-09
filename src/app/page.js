@@ -55,7 +55,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="mt-6 text-[15px] md:text-[16px] text-slate-600 font-medium max-w-[600px] leading-relaxed">
-            CloudGuard AI agents automatically detect vulnerabilities, map exposure vectors, and generate auto-remediation policies – letting your team innovate without worrying about unmanaged risk.
+            SentinelOps AI agents automatically detect vulnerabilities, map exposure vectors, and generate auto-remediation policies – letting your team innovate without worrying about unmanaged risk.
           </p>
 
           <div className="mt-8 flex items-center gap-4 mb-16">
@@ -145,7 +145,7 @@ export default function LandingPage() {
                 The intelligence engine for <br/> <strong className="font-extrabold text-blue-600">continuous cloud security</strong>
               </h2>
               <p className="mt-5 text-[15px] text-slate-500 font-medium max-w-[650px] mx-auto leading-relaxed">
-                Move past static alert fatigue. CloudGuard analyzes real-time configuration drift, network exposure, and API telemetry to automatically synthesize actionable remediation rules.
+                Move past static alert fatigue. SentinelOps analyzes real-time configuration drift, network exposure, and API telemetry to automatically synthesize actionable remediation rules.
               </p>
            </div>
 
@@ -274,10 +274,10 @@ export default function LandingPage() {
               <div className="flex-1 max-w-[280px]">
                  <div className="flex items-center gap-2 mb-4">
                    <img src="/logo.png" className="w-[20px] h-[20px] drop-shadow-sm" />
-                   <span className="font-extrabold text-[15px] tracking-tight text-slate-900">CloudGuard</span>
+                   <span className="font-extrabold text-[15px] tracking-tight text-slate-900">SentinelOps</span>
                  </div>
                  <p className="text-[12px] font-medium leading-relaxed text-slate-600 mb-6">
-                   CloudGuard is the leading Autonomous Security platform, enabling enterprises to instantly secure cloud infrastructure without human intervention.
+                   SentinelOps is the leading Autonomous Security platform, enabling enterprises to instantly secure cloud infrastructure without human intervention.
                  </p>
                  <div className="flex items-center gap-2.5">
                    {['X', 'M', 'in'].map((social) => (
@@ -311,7 +311,7 @@ export default function LandingPage() {
             </div>
 
             <div className="flex justify-between items-center text-[11px] font-medium text-slate-500 border-t border-slate-300/30 pt-6 mt-4">
-              <span>© 2026 CloudGuard AI. All Rights Reserved.</span>
+              <span>© 2026 SentinelOps AI. All Rights Reserved.</span>
               <div className="flex gap-5">
                 <a href="#" className="hover:text-slate-800 transition-colors">Privacy Policy</a>
                 <a href="#" className="hover:text-slate-800 transition-colors">Terms Of Conditions</a>

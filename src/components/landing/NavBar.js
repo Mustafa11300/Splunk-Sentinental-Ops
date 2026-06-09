@@ -13,8 +13,8 @@ export default function NavBar({ onGetStarted }) {
       <nav className="w-full bg-white/95 backdrop-blur-xl border border-slate-200 shadow-md rounded-full px-4 py-1.5 flex items-center justify-between">
         
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => scrollToNode('platform')}>
-          <img src="/logo.png" alt="CloudGuard" className="w-[18px] h-[18px] drop-shadow-sm" />
-          <span className="font-extrabold text-[14px] text-slate-800 tracking-tight">CloudGuard</span>
+          <img src="/logo.png" alt="SentinelOps" className="w-[18px] h-[18px] drop-shadow-sm" />
+          <span className="font-extrabold text-[14px] text-slate-800 tracking-tight">SentinelOps</span>
         </div>
         
         <div className="hidden lg:flex items-center gap-5 text-[12px] font-bold text-slate-500 ml-4">

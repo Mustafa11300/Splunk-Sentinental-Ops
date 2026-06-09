@@ -32,7 +32,7 @@ export default function DashboardLayout({ children }) {
         <aside className="w-[64px] flex flex-col items-center justify-between bg-white/50 backdrop-blur-3xl rounded-[20px] py-6 shadow-sm border border-white h-full shrink-0 relative z-20">
           <div className="flex flex-col items-center gap-6 w-full">
              <Link href="/" className="w-[36px] h-[36px] bg-white rounded-[10px] shadow-[0_2px_10px_rgb(0,0,0,0.06)] border border-slate-100 flex items-center justify-center cursor-pointer hover:scale-105 transition-transform overflow-hidden p-1">
-              <img src="/logo.png" alt="CloudGuard" className="w-full h-full object-contain" />
+              <img src="/logo.png" alt="SentinelOps" className="w-full h-full object-contain" />
             </Link>
 
             <nav className="flex flex-col items-center gap-1.5 w-full px-2 mt-2">

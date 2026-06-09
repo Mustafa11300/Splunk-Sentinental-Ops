@@ -1,19 +1,24 @@
 """
-CLOUDGUARD-B — UNIFIED API SERVER
+SENTINELOPS — UNIFIED API SERVER
 ===================================
-Phase 1 Foundation + Original CloudGuard API
+Autonomous Security Operations Platform
 
-Serves both:
-  - Original CloudGuard API (v1): /api/findings, /api/score, /api/chat
-  - Phase 1 Foundation API (v2): /api/v2/simulation, /api/v2/math, etc.
+Serves:
+  - Foundation API (v2): /api/v2/simulation, /api/v2/math, etc.
+  - War Room WebSocket: /ws/war-room
+  - Splunk Integration: /api/splunk/*
 
 Run with:
-  uvicorn cloudguard.app:app --reload --port 8000
+  uvicorn cloudguard.app:app --port 8001
 """
 
 import os
 import sys
 import logging
+
+# Load .env before anything reads env vars
+from dotenv import load_dotenv
+load_dotenv()
 
 # Ensure project root is on path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -42,14 +47,14 @@ logging.basicConfig(
 # ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="CloudGuard-B — Autonomous Cloud Governance",
+    title="SentinelOps — Autonomous Security Operations",
     description=(
-        "GenAI-Powered Autonomous Cloud Governance Platform.\n\n"
-        "**Phase 1**: SimulationEngine, MathEngine, StateBranchManager.\n"
-        "**Phase 2**: Multi-Agent Swarm (CISO + Controller + Orchestrator).\n"
-        "**Phase 3**: War Room — Real-time WebSocket streaming engine."
+        "AI-Powered Autonomous Security Operations Platform.\n\n"
+        "Real-time threat detection from Splunk telemetry.\n"
+        "Multi-agent swarm with Pareto-optimal remediation.\n"
+        "NIST AI RMF compliant with human-in-the-loop override."
     ),
-    version="0.3.0",
+    version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -94,9 +99,9 @@ except ImportError:
 @app.get("/", tags=["Health"])
 def health_check():
     return {
-        "status": "CloudGuard-B is running",
-        "version": "0.1.0",
-        "phase": "Phase 1 — Research-Valid Foundation",
+        "status": "SentinelOps is running",
+        "version": "1.0.0",
+        "platform": "Autonomous Security Operations",
         "docs": "/docs",
     }
 
@@ -118,9 +123,15 @@ def health_v2():
             "war_room_streamer": True,
         },
         "war_room": {
-            "ws_endpoint": "ws://localhost:8000/ws/war-room",
+            "ws_endpoint": "ws://localhost:8001/ws/war-room",
             "active_clients": len(CLIENTS),
             "buffer_events": len(EVENT_BUFFER),
             "topology_resources": len(TOPOLOGY),
         },
     }
+
+
+@app.get("/api/splunk/status", tags=["Splunk"])
+def splunk_status():
+    from cloudguard.mcp_client import get_splunk_status
+    return get_splunk_status()

@@ -17,8 +17,8 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata = {
-  title: "CloudGuard",
-  description: "Cloud Security Copilot",
+  title: "SentinelOps",
+  description: "Autonomous Security Operations Platform",
   icons: {
     icon: "/logo.png",
   },
